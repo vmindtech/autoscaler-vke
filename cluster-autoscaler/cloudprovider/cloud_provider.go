@@ -70,6 +70,8 @@ const (
 	OracleCloudProviderName = "oci"
 	// OVHcloudProviderName gets the provider name of ovhcloud
 	OVHcloudProviderName = "ovhcloud"
+	// VKEProviderName gets the provider name of vke
+	VKEProviderName = "vke"
 	// LinodeProviderName gets the provider name of linode
 	LinodeProviderName = "linode"
 	// ScalewayProviderName gets the provider name of scaleway
