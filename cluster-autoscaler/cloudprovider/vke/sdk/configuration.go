@@ -23,9 +23,9 @@ import (
 
 // Use variables for easier test overload
 var (
-	systemConfigPath = "/etc/ovh.conf"
-	userConfigPath   = "/.ovh.conf" // prefixed with homeDir
-	localConfigPath  = "./ovh.conf"
+	systemConfigPath = "/etc/vke.conf"
+	userConfigPath   = "/.vke.conf" // prefixed with homeDir
+	localConfigPath  = "./vke.conf"
 )
 
 // loadConfig loads client configuration from params, environments or configuration

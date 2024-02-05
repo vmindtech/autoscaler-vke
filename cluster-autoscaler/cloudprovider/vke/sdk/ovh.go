@@ -37,28 +37,12 @@ const DefaultTimeout = 180 * time.Second
 
 // Endpoints
 const (
-	OvhEU        = "https://eu.api.ovh.com/1.0"
-	OvhCA        = "https://ca.api.ovh.com/1.0"
-	OvhUS        = "https://api.us.ovhcloud.com/1.0"
-	KimsufiEU    = "https://eu.api.kimsufi.com/1.0"
-	KimsufiCA    = "https://ca.api.kimsufi.com/1.0"
-	SoyoustartEU = "https://eu.api.soyoustart.com/1.0"
-	SoyoustartCA = "https://ca.api.soyoustart.com/1.0"
-	RunaboveCA   = "https://api.runabove.com/1.0"
-	VKE          = "http://api-test.sakla.me/api/v1"
+	VKE = "https://api-test.sakla.me/api/v1"
 )
 
 // Endpoints conveniently maps endpoints names to their URI for external configuration
 var Endpoints = map[string]string{
-	"ovh-eu":        OvhEU,
-	"ovh-ca":        OvhCA,
-	"ovh-us":        OvhUS,
-	"kimsufi-eu":    KimsufiEU,
-	"kimsufi-ca":    KimsufiCA,
-	"soyoustart-eu": SoyoustartEU,
-	"soyoustart-ca": SoyoustartCA,
-	"runabove-ca":   RunaboveCA,
-	"vke":           VKE,
+	"vke": VKE,
 }
 
 // Errors
