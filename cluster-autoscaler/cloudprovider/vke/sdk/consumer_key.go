@@ -120,10 +120,5 @@ func (ck *CkRequest) AddRecursiveRules(methods []string, path string) {
 func (ck *CkRequest) Do() (*CkValidationState, error) {
 	state := CkValidationState{}
 	err := ck.client.PostUnAuth("/auth/credential", ck, &state, nil)
-
-	if err == nil {
-		ck.client.ConsumerKey = state.ConsumerKey
-	}
-
 	return &state, err
 }

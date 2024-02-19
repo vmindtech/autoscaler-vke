@@ -35,8 +35,8 @@ func (m *ClientMock) ListNodePools(ctx context.Context, projectID string, cluste
 }
 
 // ListNodePoolNodes mocks API call for listing node in a pool
-func (m *ClientMock) ListNodePoolNodes(ctx context.Context, projectID string, clusterID string, poolID string) ([]Node, error) {
-	args := m.Called(ctx, projectID, clusterID, poolID)
+func (m *ClientMock) ListNodePoolNodes(ctx context.Context, clusterID string, poolID string) ([]Node, error) {
+	args := m.Called(ctx, clusterID, poolID)
 
 	return args.Get(0).([]Node), args.Error(1)
 }

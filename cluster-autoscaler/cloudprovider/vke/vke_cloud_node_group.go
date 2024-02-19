@@ -23,21 +23,19 @@ import (
 	"math/rand"
 	"strings"
 	"sync"
-	"time"
 
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
-
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/vke/sdk"
 	"k8s.io/autoscaler/cluster-autoscaler/config"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/gpu"
+	"k8s.io/klog/v2"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
-const providerIDPrefix = "openstack:///"
+const providerIDPrefix = "rke2://"
 
 // NodeGroup implements cloudprovider.NodeGroup interface.
 type NodeGroup struct {
@@ -72,9 +70,6 @@ func (ng *NodeGroup) TargetSize() (int, error) {
 // IncreaseSize increases node pool size.
 func (ng *NodeGroup) IncreaseSize(delta int) error {
 	// Do not use node group which does not support autoscaling
-	if !ng.Autoscale {
-		return nil
-	}
 
 	klog.V(4).Infof("Increasing NodeGroup size by %d node(s)", delta)
 
@@ -120,9 +115,6 @@ func (ng *NodeGroup) DeleteNodes(nodes []*apiv1.Node) error {
 	defer ng.mutex.Unlock()
 
 	// Do not use node group which does not support autoscaling
-	if !ng.Autoscale {
-		return nil
-	}
 
 	klog.V(4).Infof("Deleting %d node(s)", len(nodes))
 
@@ -185,7 +177,7 @@ func (ng *NodeGroup) Debug() string {
 // Nodes returns a list of all nodes that belong to this node group.
 func (ng *NodeGroup) Nodes() ([]cloudprovider.Instance, error) {
 	// Fetch all nodes contained in the node group
-	nodes, err := ng.Manager.Client.ListNodePoolNodes(context.Background(), ng.Manager.ProjectID, ng.Manager.ClusterID, ng.ID)
+	nodes, err := ng.Manager.Client.ListNodePoolNodes(context.Background(), ng.Manager.ClusterID, ng.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list node pool nodes: %w", err)
 	}
@@ -196,7 +188,7 @@ func (ng *NodeGroup) Nodes() ([]cloudprovider.Instance, error) {
 	instances := make([]cloudprovider.Instance, 0)
 	for _, node := range nodes {
 		instance := cloudprovider.Instance{
-			Id:     fmt.Sprintf("%s%s", providerIDPrefix, node.InstanceID),
+			Id:     fmt.Sprintf("%s%s", providerIDPrefix, node.InstanceUUID),
 			Status: toInstanceStatus(node.Status),
 		}
 
@@ -214,13 +206,13 @@ func (ng *NodeGroup) TemplateNodeInfo() (*schedulerframework.NodeInfo, error) {
 	// Forge node template in a node group
 	node := &apiv1.Node{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        fmt.Sprintf("%s-node-%d", ng.Id(), rand.Int63()),
-			Labels:      ng.Template.Metadata.Labels,
-			Annotations: ng.Template.Metadata.Annotations,
-			Finalizers:  ng.Template.Metadata.Finalizers,
+			Name:        fmt.Sprintf("%v-node-%d", ng.Name, rand.Int63()),
+			Labels:      map[string]string{},
+			Annotations: map[string]string{},
+			Finalizers:  []string{},
 		},
 		Spec: apiv1.NodeSpec{
-			Taints: ng.Template.Spec.Taints,
+			Taints: []apiv1.Taint{},
 		},
 		Status: apiv1.NodeStatus{
 			Capacity:   apiv1.ResourceList{},
@@ -316,26 +308,7 @@ func (ng *NodeGroup) Autoprovisioned() bool {
 // NodeGroup. Returning a nil will result in using default options.
 func (ng *NodeGroup) GetOptions(defaults config.NodeGroupAutoscalingOptions) (*config.NodeGroupAutoscalingOptions, error) {
 	// If node group autoscaling options nil, return defaults
-	if ng.Autoscaling == nil {
-		return nil, nil
-	}
-
-	// Forge autoscaling configuration from node pool
-	cfg := &config.NodeGroupAutoscalingOptions{
-		ScaleDownUnneededTime: time.Duration(ng.Autoscaling.ScaleDownUnneededTimeSeconds) * time.Second,
-		ScaleDownUnreadyTime:  time.Duration(ng.Autoscaling.ScaleDownUnreadyTimeSeconds) * time.Second,
-	}
-
-	// Switch utilization threshold from defaults given flavor type
-	if ng.isGpu() {
-		cfg.ScaleDownUtilizationThreshold = defaults.ScaleDownUtilizationThreshold
-		cfg.ScaleDownGpuUtilizationThreshold = float64(ng.Autoscaling.ScaleDownUtilizationThreshold) // Use this one
-	} else {
-		cfg.ScaleDownUtilizationThreshold = float64(ng.Autoscaling.ScaleDownUtilizationThreshold) // Use this one
-		cfg.ScaleDownGpuUtilizationThreshold = defaults.ScaleDownGpuUtilizationThreshold
-	}
-
-	return cfg, nil
+	return nil, nil
 }
 
 // isGpu checks if a node group is using GPU machines

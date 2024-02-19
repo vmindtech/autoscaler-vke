@@ -37,9 +37,12 @@ package sdk
 // }
 
 type Node struct {
-	ClusterID   string `json:"clusterId"`
-	NodeGroupID string `json:"nodeGroupId"`
-	MinSize     int    `json:"minSize"`
-	MaxSize     int    `json:"maxSize"`
-	ComputeID   string `json:"computeId"`
+	ClusterUUID   string `json:"cluster_uuid"`
+	InstanceName  string `json:"instance_name"`
+	InstanceUUID  string `json:"instance_uuid"`
+	NodeGroupUUID string `json:"node_group_uuid"`
+	MinSize       int    `json:"node_group_min_size"`
+	MaxSize       int    `json:"node_group_max_size"`
+	Flavor        string `json:"node_flavor_uuid"`
+	Status        string `json:"node_groups_status"`
 }

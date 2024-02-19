@@ -48,6 +48,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/rancher"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/scaleway"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/tencentcloud"
+	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/vke"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/volcengine"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/vultr"
 	"k8s.io/autoscaler/cluster-autoscaler/config"
@@ -71,6 +72,7 @@ var AvailableCloudProviders = []string{
 	cloudprovider.HetznerProviderName,
 	cloudprovider.OracleCloudProviderName,
 	cloudprovider.OVHcloudProviderName,
+	cloudprovider.VKEProviderName,
 	cloudprovider.ClusterAPIProviderName,
 	cloudprovider.IonoscloudProviderName,
 	cloudprovider.KamateraProviderName,
@@ -125,6 +127,8 @@ func buildCloudProvider(opts config.AutoscalingOptions,
 		return huaweicloud.BuildHuaweiCloud(opts, do, rl)
 	case cloudprovider.OVHcloudProviderName:
 		return ovhcloud.BuildOVHcloud(opts, do, rl)
+	case cloudprovider.VKEProviderName:
+		return vke.BuildVKE(opts, do, rl)
 	case cloudprovider.HetznerProviderName:
 		return hetzner.BuildHetzner(opts, do, rl)
 	case cloudprovider.PacketProviderName, cloudprovider.EquinixMetalProviderName:

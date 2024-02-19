@@ -26,8 +26,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
@@ -37,7 +35,7 @@ const DefaultTimeout = 180 * time.Second
 
 // Endpoints
 const (
-	VKE = "https://api-test.sakla.me/api/v1"
+	VKE = "http://vke-api.sakla.me/api/v1"
 )
 
 // Endpoints conveniently maps endpoints names to their URI for external configuration
@@ -59,9 +57,6 @@ type Client struct {
 
 	// AppSecret holds the Application secret key
 	AppSecret string
-
-	// ConsumerKey holds the user/app specific token. It must have been validated before use.
-	ConsumerKey string
 
 	// API endpoint
 	endpoint string
@@ -85,11 +80,10 @@ type Client struct {
 }
 
 // NewClient represents a new client to call the API
-func NewClient(endpoint, appKey, appSecret, consumerKey string) (*Client, error) {
+func NewClient(endpoint, appKey, appSecret string, tenantid string) (*Client, error) {
 	client := Client{
 		AppKey:         appKey,
 		AppSecret:      appSecret,
-		ConsumerKey:    consumerKey,
 		Client:         &http.Client{},
 		timeDeltaMutex: &sync.Mutex{},
 		timeDeltaDone:  false,
@@ -120,13 +114,9 @@ func NewDefaultClient() (*Client, error) {
 // or configuration files using an OpenStack keystone token
 func NewDefaultClientWithToken(authUrl, token string) (*Client, error) {
 	// Find endpoint given the keystone auth url
-	endpoint := OvhEU
-	if strings.Contains(authUrl, "ovh.us") {
-		endpoint = OvhUS
-	}
-
 	// Create OVH api client
-	client, err := NewClient(endpoint, "none", "none", "none")
+	endpoint := VKE
+	client, err := NewClient(endpoint, "none", "none", "")
 	if err != nil {
 		return nil, err
 	}
@@ -313,12 +303,11 @@ func (c *Client) NewRequest(method, path string, reqBody interface{}, queryParam
 	if body != nil {
 		req.Header.Add("Content-Type", "application/json;charset=utf-8")
 	}
-	req.Header.Add("X-Ovh-Application", c.AppKey)
 	req.Header.Add("Accept", "application/json")
 
 	// Bind OpenStack token to authorization bearer and custom headers
 	if c.openStackToken != "" {
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer OpenStack/%s", c.openStackToken))
+		req.Header.Add("X-Auth-Token", fmt.Sprintf(c.openStackToken))
 	}
 
 	for headerName, headerValue := range headers {
@@ -335,20 +324,15 @@ func (c *Client) NewRequest(method, path string, reqBody interface{}, queryParam
 
 		timestamp := getLocalTime().Add(-timeDelta).Unix()
 
-		req.Header.Add("X-Ovh-Timestamp", strconv.FormatInt(timestamp, 10))
-		req.Header.Add("X-Ovh-Consumer", c.ConsumerKey)
-
 		h := sha1.New()
-		h.Write([]byte(fmt.Sprintf("%s+%s+%s+%s%s+%s+%d",
+		h.Write([]byte(fmt.Sprintf("%s+%s+%s+%s%s+%d",
 			c.AppSecret,
-			c.ConsumerKey,
 			method,
 			getEndpointForSignature(c),
 			path,
 			body,
 			timestamp,
 		)))
-		req.Header.Add("X-Ovh-Signature", fmt.Sprintf("$1$%x", h.Sum(nil)))
 	}
 
 	// Send the request with requested timeout
@@ -425,14 +409,13 @@ func (c *Client) CallAPIWithContext(ctx context.Context, method, path string, re
 	if err != nil {
 		return err
 	}
-
 	err = c.UnmarshalResponse(response, result)
 	if err != nil {
 		// An error 500 on api.ovh.com could be due to the tenant being canadian and too recent, so let's retry on ca.api.ovh.
 		// This is a temporary fix until the issue is correctly handled
 		if IsPossiblyCanadianTenantSyncError(err, req.URL.String()) {
 			// Create a canadian API client with the same token
-			client, err2 := NewClient(OvhCA, "none", "none", "none")
+			client, err2 := NewClient(VKE, "none", "none", "")
 			if err2 != nil {
 				return fmt.Errorf("failed to create canadian ovh API client for fallback: %w", err2)
 			}

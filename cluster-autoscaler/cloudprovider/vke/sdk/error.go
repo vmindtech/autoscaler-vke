@@ -58,7 +58,7 @@ func (e Error) Error() string {
 // This is a temporary fix until the issue is correctly handled
 func IsPossiblyCanadianTenantSyncError(err error, url string) bool {
 	var apiError *APIError
-	return (strings.HasPrefix(url, VKE) || strings.HasPrefix(url, "https://test-vke-api.sakla.me/api/v1")) &&
+	return (strings.HasPrefix(url, VKE) || strings.HasPrefix(url, "http://vke-api.sakla.me/e/api/v1")) &&
 		errors.As(err, &apiError) &&
 		apiError.Code == http.StatusInternalServerError &&
 		apiError.Message == canadianTenantSyncErrorMessage

@@ -19,71 +19,28 @@ package sdk
 import (
 	"context"
 	"fmt"
-	"time"
-
-	v1 "k8s.io/api/core/v1"
 )
 
 type NodePool struct {
-	ID        string `json:"id"`
-	ProjectID string `json:"projectId"`
+	ID string `json:"node_group_uuid"`
 
-	Name       string `json:"name"`
-	Flavor     string `json:"flavor"`
-	Status     string `json:"status"`
-	SizeStatus string `json:"sizeStatus"`
+	Name   string `json:"node_group_name"`
+	Flavor string `json:"node_flavor_uuid"`
+	Status string `json:"node_groups_status"`
 
-	Autoscale     bool `json:"autoscale"`
-	MonthlyBilled bool `json:"monthlyBilled"`
-	AntiAffinity  bool `json:"antiAffinity"`
-
-	DesiredNodes   uint32 `json:"desiredNodes"`
-	MinNodes       uint32 `json:"minNodes"`
-	MaxNodes       uint32 `json:"maxNodes"`
-	CurrentNodes   uint32 `json:"currentNodes"`
-	AvailableNodes uint32 `json:"availableNodes"`
-	UpToDateNodes  uint32 `json:"upToDateNodes"`
-
-	Autoscaling *NodePoolAutoscaling `json:"autoscaling,omitempty"`
-
-	Template struct {
-		Metadata struct {
-			Labels      map[string]string `json:"labels"`
-			Annotations map[string]string `json:"annotations"`
-			Finalizers  []string          `json:"finalizers"`
-		} `json:"metadata"`
-
-		Spec struct {
-			Unschedulable bool       `json:"unschedulable"`
-			Taints        []v1.Taint `json:"taints"`
-		} `json:"spec"`
-	} `json:"template"`
-
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-type NodePoolAutoscaling struct {
-	CpuMin float32 `json:"cpuMin"`
-	CpuMax float32 `json:"cpuMax"`
-
-	MemoryMin float32 `json:"memoryMin"`
-	MemoryMax float32 `json:"memoryMax"`
-
-	ScaleDownUtilizationThreshold float32 `json:"scaleDownUtilizationThreshold"`
-
-	ScaleDownUnneededTimeSeconds int32 `json:"scaleDownUnneededTimeSeconds"`
-	ScaleDownUnreadyTimeSeconds  int32 `json:"scaleDownUnreadyTimeSeconds"`
+	MinNodes     uint32 `json:"node_group_min_size"`
+	MaxNodes     uint32 `json:"node_group_max_size"`
+	CurrentNodes uint32 `json:"current_nodes"`
+	DesiredNodes uint32 `json:"desired_nodes"`
 }
 
 // ListNodePools allows to list all node pools available in a cluster
-func (c *Client) ListNodePools(ctx context.Context, projectID, clusterID string) ([]NodePool, error) {
+func (c *Client) ListNodePools(ctx context.Context, clusterID string) ([]NodePool, error) {
 	nodepools := make([]NodePool, 0)
-
 	return nodepools, c.CallAPIWithContext(
 		ctx,
 		"GET",
-		fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool", projectID, clusterID),
+		fmt.Sprintf("/cluster/%s/nodegroups", clusterID),
 		nil,
 		&nodepools,
 		nil,
@@ -93,13 +50,13 @@ func (c *Client) ListNodePools(ctx context.Context, projectID, clusterID string)
 }
 
 // GetNodePool allows to display information for a specific node pool
-func (c *Client) GetNodePool(ctx context.Context, projectID string, clusterID string, poolID string) (*NodePool, error) {
+func (c *Client) GetNodePool(ctx context.Context, clusterID string, poolID string) (*NodePool, error) {
 	nodepool := &NodePool{}
 
 	return nodepool, c.CallAPIWithContext(
 		ctx,
 		"GET",
-		fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s", projectID, clusterID, poolID),
+		fmt.Sprintf("/cluster/%s/nodepool/%s", clusterID, poolID),
 		nil,
 		&nodepool,
 		nil,
@@ -109,16 +66,16 @@ func (c *Client) GetNodePool(ctx context.Context, projectID string, clusterID st
 }
 
 // ListNodePoolNodes allows to display nodes contained in a parent node pool
-func (c *Client) ListNodePoolNodes(ctx context.Context, projectID string, clusterID string, poolID string) ([]Node, error) {
+func (c *Client) ListNodePoolNodes(ctx context.Context, clusterID string, poolID string) ([]Node, error) {
 	nodes := make([]Node, 0)
 
 	return nodes, c.CallAPIWithContext(
 		ctx,
 		"GET",
-		fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s/nodes", projectID, clusterID, poolID),
+		fmt.Sprintf("/cluster/%s/nodegroups/%s/nodes", clusterID, poolID),
 		nil,
 		&nodes,
-		"vke",
+		nil,
 		nil,
 		true,
 	)
@@ -139,6 +96,7 @@ type CreateNodePoolOpts struct {
 }
 
 // CreateNodePool allows to creates a node pool in a cluster
+
 func (c *Client) CreateNodePool(ctx context.Context, projectID string, clusterID string, opts *CreateNodePoolOpts) (*NodePool, error) {
 	nodepool := &NodePool{}
 

@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/magnum/gophercloud"
-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/magnum/gophercloud/openstack"
+	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/vke/gophercloud"
+	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/vke/gophercloud/openstack"
 )
 
 // DefaultExpirationTime is the maximum time to be alive of an OpenStack keystone token.
-const DefaultExpirationTime = 23 * time.Hour
+const DefaultExpirationTime = 1 * time.Hour
 
 // OpenStackProvider defines a custom OpenStack provider with a token to re-authenticate
 type OpenStackProvider struct {
@@ -35,16 +35,20 @@ type OpenStackProvider struct {
 	Token               string
 	tokenExpirationTime time.Time
 }
+type Auth struct {
+	IdentityEndpoint            string `json:"identity_endpoint"`
+	ApplicationCredentialID     string `json:"application_credential_id"`
+	ApplicationCredentialSecret string `json:"application_credential_secret"`
+}
 
 // NewOpenStackProvider initializes a client/token pair to interact with OpenStack
-func NewOpenStackProvider(authUrl string, username string, password string, domain string, tenant string) (*OpenStackProvider, error) {
+func NewOpenStackProvider(authUrl string, ApplicationCredentialID string, ApplicationCredentialSecret string, TenantID string) (*OpenStackProvider, error) {
 	provider, err := openstack.AuthenticatedClient(gophercloud.AuthOptions{
-		IdentityEndpoint: authUrl,
-		Username:         username,
-		Password:         password,
-		DomainName:       domain,
-		TenantID:         tenant,
-		AllowReauth:      true,
+		IdentityEndpoint:            authUrl,
+		ApplicationCredentialID:     ApplicationCredentialID,
+		ApplicationCredentialSecret: ApplicationCredentialSecret,
+		TenantID:                    TenantID,
+		AllowReauth:                 true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OpenStack authenticated client: %w", err)

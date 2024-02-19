@@ -92,17 +92,13 @@ func (provider *VKEProvider) Name() string {
 }
 
 // NodeGroups returns all node groups configured for this cloud provider.
-func (provider *VKEManager) NodeGroups() []cloudprovider.NodeGroup {
+// NodeGroups returns all node groups configured for this cloud provider.
+func (provider *VKEProvider) NodeGroups() []cloudprovider.NodeGroup {
 	groups := make([]cloudprovider.NodeGroup, 0)
-
 	// Cast API node pools into CA node groups
+	klog.V(4).Infof("Listing node pools to build NodeGroups %v", provider.manager.NodePools)
 	for _, pool := range provider.manager.NodePools {
 		// Node pools without autoscaling are equivalent to node pools with autoscaling but no scale possible
-		if !pool.Autoscale {
-			pool.MaxNodes = pool.DesiredNodes
-			pool.MinNodes = pool.DesiredNodes
-		}
-
 		ng := NodeGroup{
 			NodePool:    pool,
 			Manager:     provider.manager,
@@ -180,8 +176,10 @@ func (provider *VKEProvider) findNodeGroupFromLabel(node *apiv1.Node) cloudprovi
 
 // findNodeGroupByListingNodes finds the associated node group from by listing all nodes under autoscaled node pools
 func (provider *VKEProvider) findNodeGroupByListingNodes(node *apiv1.Node) (cloudprovider.NodeGroup, error) {
+	klog.V(4).Infof("Call findNodeGroupByListingNodes %v", provider.NodeGroups())
 	for _, ng := range provider.NodeGroups() {
 		instances, err := ng.Nodes()
+		klog.V(4).Infof("Listing nodes in node group %v", instances)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list nodes in node group %s: %w", ng.Id(), err)
 		}
@@ -299,13 +297,14 @@ func (provider *VKEProvider) Refresh() error {
 		return fmt.Errorf("failed to re-authenticate client: %w", err)
 	}
 
-	pools, err := provider.manager.Client.ListNodePools(context.Background(), provider.manager.ProjectID, provider.manager.ClusterID)
+	pools, err := provider.manager.Client.ListNodePools(context.Background(), provider.manager.ClusterID)
 	if err != nil {
 		return fmt.Errorf("failed to refresh node pool list: %w", err)
 	}
 
 	// Update the node pools cache
 	provider.manager.NodePools = pools
+	klog.V(4).Infof("Node pools refreshed: %v", pools)
 
 	return nil
 }
