@@ -49,7 +49,7 @@ type ClientInterface interface {
 	DeleteNodePool(ctx context.Context, projectID string, clusterID string, poolID string) (*sdk.NodePool, error)
 
 	// ListClusterFlavors list all available flavors usable in a Kubernetes cluster.
-	ListClusterFlavors(ctx context.Context, projectID string, clusterID string) ([]sdk.Flavor, error)
+	ListClusterFlavors(ctx context.Context, clusterID string) ([]sdk.Flavor, error)
 }
 
 type VKEManager struct {
@@ -129,7 +129,7 @@ func (m *VKEManager) getFlavorsByName() (map[string]sdk.Flavor, error) {
 		klog.V(4).Infof("Listing flavors to update flavors cache (will expire at %s)", newFlavorCacheExpirationTime)
 
 		// Fetch all flavors in API
-		flavors, err := m.Client.ListClusterFlavors(context.Background(), m.ProjectID, m.ClusterID)
+		flavors, err := m.Client.ListClusterFlavors(context.Background(), m.ClusterID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list available flavors: %w", err)
 		}

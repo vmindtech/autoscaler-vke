@@ -31,13 +31,13 @@ type Flavor struct {
 }
 
 // ListClusterFlavors allows to display flavors available for nodes templates
-func (c *Client) ListClusterFlavors(ctx context.Context, projectID string, clusterID string) ([]Flavor, error) {
+func (c *Client) ListClusterFlavors(ctx context.Context, clusterID string) ([]Flavor, error) {
 	flavors := make([]Flavor, 0)
 
 	return flavors, c.CallAPIWithContext(
 		ctx,
 		"GET",
-		fmt.Sprintf("/cloud/project/%s/kube/%s/flavors", projectID, clusterID),
+		fmt.Sprintf("/cluster/%s/flavors", clusterID),
 		nil,
 		&flavors,
 		nil,
