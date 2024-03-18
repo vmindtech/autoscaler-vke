@@ -96,7 +96,7 @@ func (provider *VKEProvider) Name() string {
 func (provider *VKEProvider) NodeGroups() []cloudprovider.NodeGroup {
 	groups := make([]cloudprovider.NodeGroup, 0)
 	// Cast API node pools into CA node groups
-	klog.V(4).Infof("Listing node pools to build NodeGroups %v", provider.manager.NodePools)
+	klog.V(5).Infof("Listing node pools to build NodeGroups %v", provider.manager.NodePools)
 	for _, pool := range provider.manager.NodePools {
 		// Node pools without autoscaling are equivalent to node pools with autoscaling but no scale possible
 		ng := NodeGroup{
@@ -116,26 +116,23 @@ func (provider *VKEProvider) NodeGroups() []cloudprovider.NodeGroup {
 // occurred. Must be implemented.
 func (provider *VKEProvider) NodeGroupForNode(node *apiv1.Node) (cloudprovider.NodeGroup, error) {
 	// We won't be able to determine the node group of the node with the information at hand.
-	if node.Spec.ProviderID == providerIDPrefix {
-		return nil, nil
-	}
 
 	// Try to retrieve the associated node group from an already built mapping in cache
-	if ng := provider.findNodeGroupFromCache(node.Spec.ProviderID); ng != nil {
+	if ng := provider.findNodeGroupFromCache(node.Name); ng != nil {
 		return ng, nil
 	}
 
-	// Try to find the associated node group from the nodepool label on the node
-	if ng := provider.findNodeGroupFromLabel(node); ng != nil {
-		return ng, nil
-	}
+	// // Try to find the associated node group from the nodepool label on the node
+	// if ng := provider.findNodeGroupFromLabel(node); ng != nil {
+	// 	return ng, nil
+	// }
 
-	klog.V(4).Infof("trying to find node group of node %s (provider ID %s) by listing all nodes under autoscaled node pools", node.Name, node.Spec.ProviderID)
+	klog.V(5).Infof("trying to find node group of node %s (provider ID %s) by listing all nodes under autoscaled node pools", node.Name, node.Name)
 
 	// This should also refresh the cache for the next time
 	ng, err := provider.findNodeGroupByListingNodes(node)
 	if ng == nil {
-		klog.Warningf("unable to find which node group the node %s (provider ID %s) belongs to", node.Name, node.Spec.ProviderID)
+		klog.Warningf("unable to find which node group the node %s (provider ID %s) belongs to", node.Name, node.Name)
 	}
 
 	return ng, err
@@ -155,38 +152,44 @@ func (provider *VKEProvider) findNodeGroupFromCache(providerID string) cloudprov
 	return nil // To avoid returning a (*cloudprovider.NodeGroup)(nil), which is different from nil
 }
 
-// findNodeGroupFromLabel tries to find the associated node group from the nodepool label on the node
-func (provider *VKEProvider) findNodeGroupFromLabel(node *apiv1.Node) cloudprovider.NodeGroup {
-	// Retrieve the label specifying the pool the node belongs to
-	labels := node.GetLabels()
-	label, exists := labels[NodePoolLabel]
-	if !exists {
-		return nil
-	}
+// // findNodeGroupFromLabel tries to find the associated node group from the nodepool label on the node
+// func (provider *VKEProvider) findNodeGroupFromLabel(node *apiv1.Node) cloudprovider.NodeGroup {
+// 	// Retrieve the label specifying the pool the node belongs to
+// 	labels := node.GetLabels()
+// 	label, exists := labels[NodePoolLabel]
+// 	if !exists {
+// 		return nil
+// 	}
 
-	// Find in the node groups stored in cache the one with the same name
-	for _, ng := range provider.NodeGroups() {
-		if ng.Id() == label {
-			return ng
-		}
-	}
+// 	// Find in the node groups stored in cache the one with the same name
+// 	for _, ng := range provider.NodeGroups() {
+// 		if ng.Id() == label {
+// 			return ng
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 // findNodeGroupByListingNodes finds the associated node group from by listing all nodes under autoscaled node pools
 func (provider *VKEProvider) findNodeGroupByListingNodes(node *apiv1.Node) (cloudprovider.NodeGroup, error) {
-	klog.V(4).Infof("Call findNodeGroupByListingNodes %v", provider.NodeGroups())
 	for _, ng := range provider.NodeGroups() {
 		instances, err := ng.Nodes()
-		klog.V(4).Infof("Listing nodes in node group %v", instances)
+		klog.V(5).Infof("Listing nodes in node group %v", instances)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list nodes in node group %s: %w", ng.Id(), err)
 		}
 
 		for _, instance := range instances {
-			if instance.Id == node.Spec.ProviderID {
-				return ng, nil
+			klog.V(5).Infof("Instance %s and Host Name: %s: Len instance len: %v ", instance.Id, node.Name, len(instance.Id))
+			if len(instance.Id) <= 69 {
+				if instance.Id == node.Name {
+					return ng, nil
+				}
+			} else {
+				if instance.Id[0:69] == node.Name {
+					return ng, nil
+				}
 			}
 		}
 	}
@@ -206,7 +209,7 @@ func (provider *VKEProvider) Pricing() (cloudprovider.PricingModel, errors.Autos
 func (provider *VKEProvider) GetAvailableMachineTypes() ([]string, error) {
 	klog.V(4).Info("Getting available machine types")
 
-	flavorsByName, err := provider.manager.getFlavorsByName()
+	flavorsByName, err := provider.manager.getFlavorsByID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get flavors: %w", err)
 	}
@@ -215,7 +218,7 @@ func (provider *VKEProvider) GetAvailableMachineTypes() ([]string, error) {
 	machineTypes := make([]string, 0)
 	for _, flavor := range flavorsByName {
 		if flavor.State == MachineAvailableState {
-			machineTypes = append(machineTypes, flavor.Name)
+			machineTypes = append(machineTypes, flavor.Id)
 		}
 	}
 
@@ -256,7 +259,7 @@ func (provider *VKEProvider) GPULabel() string {
 func (provider *VKEProvider) GetAvailableGPUTypes() map[string]struct{} {
 	klog.V(4).Info("Getting available GPU types")
 
-	flavorsByName, err := provider.manager.getFlavorsByName()
+	flavorsByName, err := provider.manager.getFlavorsByID()
 	if err != nil {
 		klog.Errorf("Failed to get flavors: %v", err)
 		return nil
@@ -266,7 +269,7 @@ func (provider *VKEProvider) GetAvailableGPUTypes() map[string]struct{} {
 	gpuTypes := make(map[string]struct{}, 0)
 	for _, flavor := range flavorsByName {
 		if flavor.State == MachineAvailableState && flavor.GPUs > 0 {
-			gpuTypes[flavor.Name] = struct{}{}
+			gpuTypes[flavor.Id] = struct{}{}
 		}
 	}
 
@@ -296,15 +299,16 @@ func (provider *VKEProvider) Refresh() error {
 	if err != nil {
 		return fmt.Errorf("failed to re-authenticate client: %w", err)
 	}
-
+	klog.V(4).Infof("ClusterId: %s", provider.manager.ClusterID)
 	pools, err := provider.manager.Client.ListNodePools(context.Background(), provider.manager.ClusterID)
+	klog.V(5).Infof("Pools: %v", pools)
 	if err != nil {
 		return fmt.Errorf("failed to refresh node pool list: %w", err)
 	}
 
 	// Update the node pools cache
 	provider.manager.NodePools = pools
-	klog.V(4).Infof("Node pools refreshed: %v", pools)
+	klog.V(5).Infof("Node pools refreshed: %v", pools)
 
 	return nil
 }

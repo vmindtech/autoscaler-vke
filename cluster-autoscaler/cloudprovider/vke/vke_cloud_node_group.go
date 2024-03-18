@@ -35,8 +35,6 @@ import (
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
-const providerIDPrefix = "rke2://"
-
 // NodeGroup implements cloudprovider.NodeGroup interface.
 type NodeGroup struct {
 	sdk.NodePool
@@ -60,11 +58,11 @@ func (ng *NodeGroup) MinSize() int {
 // number is different from the number of nodes registered in Kubernetes.
 func (ng *NodeGroup) TargetSize() (int, error) {
 	// By default, fetch the API desired nodes before using target size from autoscaler
-	if ng.CurrentSize == -1 {
+	klog.V(4).Infof("NodeGroup %s has a target size of %d", ng.ID, ng.CurrentNodes)
+	if ng.CurrentNodes == -1 {
 		return int(ng.DesiredNodes), nil
 	}
-
-	return ng.CurrentSize, nil
+	return ng.CurrentNodes, nil
 }
 
 // IncreaseSize increases node pool size.
@@ -95,13 +93,18 @@ func (ng *NodeGroup) IncreaseSize(delta int) error {
 		DesiredNodes: &desired,
 	}
 	klog.V(4).Infof("Upscaling node pool %s to %d desired nodes", ng.ID, desired)
-
-	// Call API to increase desired nodes number, automatically creating new nodes
-	resp, err := ng.Manager.Client.UpdateNodePool(context.Background(), ng.Manager.ProjectID, ng.Manager.ClusterID, ng.ID, &opts)
-	if err != nil {
-		return fmt.Errorf("failed to increase node pool desired size: %w", err)
+	for i := 0; i < delta; i++ {
+		_, err := ng.Manager.Client.AddNode(context.Background(), ng.Manager.ClusterID, ng.ID)
+		if err != nil {
+			return fmt.Errorf("failed to increase node pool desired size: %w", err)
+		}
+		// Call API to increase desired nodes number, automatically creating new nodes
+		resp, err := ng.Manager.Client.UpdateNodePool(context.Background(), ng.Manager.ClusterID, ng.ID, &opts)
+		if err != nil {
+			return fmt.Errorf("failed to increase node pool desired size: %w", err)
+		}
+		ng.Status = resp.Status
 	}
-	ng.Status = resp.Status
 
 	return nil
 }
@@ -119,33 +122,37 @@ func (ng *NodeGroup) DeleteNodes(nodes []*apiv1.Node) error {
 	klog.V(4).Infof("Deleting %d node(s)", len(nodes))
 
 	// First, verify the NodeGroup can be decreased
-	size, err := ng.TargetSize()
+	NodeGroupInstances, err := ng.Manager.Client.ListNodePoolNodes(context.Background(), ng.Manager.ClusterID, ng.ID)
 	if err != nil {
-		return fmt.Errorf("failed to get NodeGroup target size")
+		return fmt.Errorf("failed to list node pool nodes: %w", err)
 	}
-
+	klog.V(5).Infof("DeleteNodes Triggered. Active Count: %d", len(NodeGroupInstances))
+	size := len(NodeGroupInstances)
 	if size-len(nodes) < ng.MinSize() {
 		return fmt.Errorf("node group size would be below minimum size - desired: %d, max: %d", size-len(nodes), ng.MinSize())
 	}
 
-	nodeProviderIds := make([]string, 0)
 	for _, node := range nodes {
-		nodeProviderIds = append(nodeProviderIds, node.Spec.ProviderID)
+		size, err = ng.TargetSize()
+		if err != nil {
+			return fmt.Errorf("failed to get NodeGroup target size")
+		}
+		err = ng.Manager.Client.DeleteNode(context.Background(), ng.Manager.ClusterID, ng.ID, node.Name)
+		if err != nil {
+			return fmt.Errorf("failed to delete node %s: %w", node.Name, err)
+		}
 	}
-
 	desired := uint32(size - len(nodes))
 	opts := sdk.UpdateNodePoolOpts{
-		DesiredNodes:  &desired,
-		NodesToRemove: nodeProviderIds,
+		DesiredNodes: &desired,
 	}
-	klog.V(4).Infof("Downscaling node pool %s to %d desired nodes by deleting the following nodes: %s", ng.ID, desired, nodeProviderIds)
+	klog.V(4).Infof("Downscaling node pool %s to %d desired nodes by deleting the following nodes: %s", ng.ID, desired, nodes)
 
 	// Call API to remove nodes from a NodeGroup
-	resp, err := ng.Manager.Client.UpdateNodePool(context.Background(), ng.Manager.ProjectID, ng.Manager.ClusterID, ng.ID, &opts)
+	resp, err := ng.Manager.Client.UpdateNodePool(context.Background(), ng.Manager.ClusterID, ng.ID, &opts)
 	if err != nil {
 		return fmt.Errorf("failed to delete node pool nodes: %w", err)
 	}
-
 	// Update the node group
 	ng.Status = resp.Status
 	ng.CurrentSize = size - len(nodes)
@@ -188,7 +195,7 @@ func (ng *NodeGroup) Nodes() ([]cloudprovider.Instance, error) {
 	instances := make([]cloudprovider.Instance, 0)
 	for _, node := range nodes {
 		instance := cloudprovider.Instance{
-			Id:     fmt.Sprintf("%s%s", providerIDPrefix, node.InstanceUUID),
+			Id:     fmt.Sprintf("%s", node.InstanceName),
 			Status: toInstanceStatus(node.Status),
 		}
 
@@ -280,7 +287,7 @@ func (ng *NodeGroup) Create() (cloudprovider.NodeGroup, error) {
 	return &NodeGroup{
 		NodePool:    *np,
 		Manager:     ng.Manager,
-		CurrentSize: int(ng.DesiredNodes),
+		CurrentSize: int(ng.CurrentSize),
 	}, nil
 }
 

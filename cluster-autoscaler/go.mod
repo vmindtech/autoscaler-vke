@@ -42,7 +42,7 @@ require (
 	k8s.io/api v0.29.0-alpha.3
 	k8s.io/apimachinery v0.29.0-alpha.3
 	k8s.io/apiserver v0.29.0-alpha.3
-	k8s.io/client-go v0.29.0-alpha.3
+	k8s.io/client-go v1.5.2
 	k8s.io/cloud-provider v0.29.0-alpha.3
 	k8s.io/cloud-provider-aws v1.27.0
 	k8s.io/code-generator v0.29.0-alpha.3

@@ -22,7 +22,7 @@ import (
 )
 
 type Flavor struct {
-	Name     string `json:"name"`
+	Id       string `json:"id"`
 	Category string `json:"category"`
 	State    string `json:"state"`
 	VCPUs    int    `json:"vCPUs"`

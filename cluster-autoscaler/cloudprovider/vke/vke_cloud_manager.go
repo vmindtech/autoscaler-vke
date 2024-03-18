@@ -43,13 +43,18 @@ type ClientInterface interface {
 	CreateNodePool(ctx context.Context, projectID string, clusterID string, opts *sdk.CreateNodePoolOpts) (*sdk.NodePool, error)
 
 	// UpdateNodePool updates the details of an existing node pool.
-	UpdateNodePool(ctx context.Context, projectID string, clusterID string, poolID string, opts *sdk.UpdateNodePoolOpts) (*sdk.NodePool, error)
+	UpdateNodePool(ctx context.Context, clusterID string, poolID string, opts *sdk.UpdateNodePoolOpts) (*sdk.NodePool, error)
 
 	// DeleteNodePool deletes a specific pool.
 	DeleteNodePool(ctx context.Context, projectID string, clusterID string, poolID string) (*sdk.NodePool, error)
 
+	// DeleteNode deletes a specific node.
+	DeleteNode(ctx context.Context, clusterID string, nodeGroupID string, instanceName string) error
+
 	// ListClusterFlavors list all available flavors usable in a Kubernetes cluster.
 	ListClusterFlavors(ctx context.Context, clusterID string) ([]sdk.Flavor, error)
+	//AddNode adds a node to a node pool
+	AddNode(ctx context.Context, clusterID string, nodeGroupID string) (*sdk.Node, error)
 }
 
 type VKEManager struct {
@@ -122,7 +127,7 @@ func NewManager(configFile io.Reader) (*VKEManager, error) {
 	}, nil
 }
 
-func (m *VKEManager) getFlavorsByName() (map[string]sdk.Flavor, error) {
+func (m *VKEManager) getFlavorsByID() (map[string]sdk.Flavor, error) {
 	// Update the flavors cache if expired
 	if m.FlavorsCacheExpirationTime.Before(time.Now()) {
 		newFlavorCacheExpirationTime := time.Now().Add(flavorCacheDuration)
@@ -137,7 +142,7 @@ func (m *VKEManager) getFlavorsByName() (map[string]sdk.Flavor, error) {
 		// Update the flavors cache
 		m.FlavorsCache = make(map[string]sdk.Flavor)
 		for _, flavor := range flavors {
-			m.FlavorsCache[flavor.Name] = flavor
+			m.FlavorsCache[flavor.Id] = flavor
 			m.FlavorsCacheExpirationTime = newFlavorCacheExpirationTime
 		}
 	}
@@ -147,7 +152,7 @@ func (m *VKEManager) getFlavorsByName() (map[string]sdk.Flavor, error) {
 
 // getFlavorByName returns the given flavor from cache or API
 func (m *VKEManager) getFlavorByName(flavorName string) (sdk.Flavor, error) {
-	flavorsByName, err := m.getFlavorsByName()
+	flavorsByName, err := m.getFlavorsByID()
 	if err != nil {
 		return sdk.Flavor{}, err
 	}
@@ -177,11 +182,20 @@ func (m *VKEManager) getNodeGroupPerProviderID(providerID string) *NodeGroup {
 
 // ReAuthenticate allows OpenStack keystone token to be revoked and re-created to call API
 func (m *VKEManager) ReAuthenticate() error {
-
+	if m.OpenStackProvider != nil {
+		klog.V(4).Infof("m.OpenStackProvider.IsTokenExpired():  %v ", m.OpenStackProvider.IsTokenExpired())
+		if m.OpenStackProvider.IsTokenExpired() {
+			err := m.OpenStackProvider.ReauthenticateToken()
+			if err != nil {
+				return fmt.Errorf("failed to re-authenticate OpenStack token: %w", err)
+			}
+		}
+	}
 	client, err := sdk.NewDefaultClientWithToken(m.OpenStackProvider.AuthUrl, m.OpenStackProvider.Token)
 	if err != nil {
 		return fmt.Errorf("failed to re-create client: %w", err)
 	}
+
 	m.Client = client
 
 	return nil

@@ -19,6 +19,8 @@ package sdk
 import (
 	"context"
 	"fmt"
+
+	"k8s.io/klog/v2"
 )
 
 type NodePool struct {
@@ -30,12 +32,13 @@ type NodePool struct {
 
 	MinNodes     uint32 `json:"node_group_min_size"`
 	MaxNodes     uint32 `json:"node_group_max_size"`
-	CurrentNodes uint32 `json:"current_nodes"`
+	CurrentNodes int    `json:"current_nodes"`
 	DesiredNodes uint32 `json:"desired_nodes"`
 }
 
 // ListNodePools allows to list all node pools available in a cluster
 func (c *Client) ListNodePools(ctx context.Context, clusterID string) ([]NodePool, error) {
+	klog.V(2).Infof("Listing node pools for cluster %s", clusterID)
 	nodepools := make([]NodePool, 0)
 	return nodepools, c.CallAPIWithContext(
 		ctx,
@@ -124,13 +127,13 @@ type UpdateNodePoolOpts struct {
 }
 
 // UpdateNodePool allows to update a specific node pool properties (this call is used for resize)
-func (c *Client) UpdateNodePool(ctx context.Context, projectID string, clusterID string, poolID string, opts *UpdateNodePoolOpts) (*NodePool, error) {
+func (c *Client) UpdateNodePool(ctx context.Context, clusterID string, poolID string, opts *UpdateNodePoolOpts) (*NodePool, error) {
 	nodepool := &NodePool{}
 
 	return nodepool, c.CallAPIWithContext(
 		ctx,
 		"PUT",
-		fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s", projectID, clusterID, poolID),
+		fmt.Sprintf("/cluster/%s/nodegroups/%s", clusterID, poolID),
 		opts,
 		&nodepool,
 		nil,
@@ -149,6 +152,34 @@ func (c *Client) DeleteNodePool(ctx context.Context, projectID string, clusterID
 		fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s", projectID, clusterID, poolID),
 		nil,
 		&nodepool,
+		nil,
+		nil,
+		true,
+	)
+}
+func (c *Client) DeleteNode(ctx context.Context, clusterID, NodeGroupID, NodeName string) error {
+	klog.V(2).Infof("Deleting node %s from cluster %s", NodeName, clusterID)
+	c.CallAPIWithContext(
+		ctx,
+		"DELETE",
+		fmt.Sprintf("/cluster/%s/nodegroups/%s/nodes/%s", clusterID, NodeGroupID, NodeName),
+		nil,
+		nil,
+		nil,
+		nil,
+		true,
+	)
+	return nil
+}
+func (c *Client) AddNode(ctx context.Context, clusterID, NodeGroupID string) (*Node, error) {
+	klog.V(2).Infof("Adding node to cluster %s", clusterID)
+	node := &Node{}
+	return node, c.CallAPIWithContext(
+		ctx,
+		"PUT",
+		fmt.Sprintf("/cluster/%s/nodegroups/%s/nodes/add", clusterID, NodeGroupID),
+		nil,
+		node,
 		nil,
 		nil,
 		true,

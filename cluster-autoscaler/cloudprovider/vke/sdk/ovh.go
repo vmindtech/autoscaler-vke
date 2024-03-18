@@ -116,7 +116,7 @@ func NewDefaultClientWithToken(authUrl, token string) (*Client, error) {
 	// Find endpoint given the keystone auth url
 	// Create OVH api client
 	endpoint := VKE
-	client, err := NewClient(endpoint, "none", "none", "")
+	client, err := NewClient(endpoint, "none", "none", "none")
 	if err != nil {
 		return nil, err
 	}

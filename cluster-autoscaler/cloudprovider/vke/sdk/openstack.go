@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/vke/gophercloud"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/vke/gophercloud/openstack"
+	"k8s.io/klog/v2"
 )
 
 // DefaultExpirationTime is the maximum time to be alive of an OpenStack keystone token.
@@ -64,6 +65,7 @@ func NewOpenStackProvider(authUrl string, ApplicationCredentialID string, Applic
 
 // ReauthenticateToken revoke the current provider token and re-create a new one
 func (p *OpenStackProvider) ReauthenticateToken() error {
+	klog.V(5).Infof("ReauthenticateToken() Re-authenticating OpenStack token")
 	err := p.provider.Reauthenticate(p.Token)
 	if err != nil {
 		return fmt.Errorf("failed to re-auth previous openstack token: %w", err)
@@ -77,5 +79,6 @@ func (p *OpenStackProvider) ReauthenticateToken() error {
 
 // IsTokenExpired checks if the current token is expired
 func (p *OpenStackProvider) IsTokenExpired() bool {
+	klog.V(5).Infof("IsTokenExpired() Token expiration time")
 	return p.tokenExpirationTime.Before(time.Now())
 }

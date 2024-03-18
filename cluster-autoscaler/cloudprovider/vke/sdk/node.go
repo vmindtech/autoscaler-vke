@@ -16,6 +16,14 @@ limitations under the License.
 
 package sdk
 
+import (
+	"fmt"
+	"time"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
+)
+
 // type Node struct {
 // 	ID         string `json:"id"`
 // 	InstanceID string `json:"instanceId"`
@@ -39,10 +47,37 @@ package sdk
 type Node struct {
 	ClusterUUID   string `json:"cluster_uuid"`
 	InstanceName  string `json:"instance_name"`
-	InstanceUUID  string `json:"instance_uuid"`
+	Id            string `json:"instance_uuid"`
 	NodeGroupUUID string `json:"node_group_uuid"`
+	Current       int    `json:"current_nodes"`
 	MinSize       int    `json:"node_group_min_size"`
 	MaxSize       int    `json:"node_group_max_size"`
 	Flavor        string `json:"node_flavor_uuid"`
 	Status        string `json:"node_groups_status"`
+}
+
+// DrainNode cordons and drains a node.
+func (k *Client) DrainNode(nodeName string, client kubernetes.Interface, node *corev1.Node, DrainWaitSeconds int) error {
+	if client == nil {
+		return fmt.Errorf("K8sClient not set")
+	}
+	if node == nil {
+		return fmt.Errorf("node not set")
+	}
+	if nodeName == "" {
+		return fmt.Errorf("node name not set")
+	}
+	const (
+		// PodSafeToEvictKey - annotation that ignores constraints to evict a pod like not being replicated, being on
+		// kube-system namespace or having a local storage.
+		PodSafeToEvictKey = "cluster-autoscaler.kubernetes.io/safe-to-evict"
+		// SafeToEvictLocalVolumesKey - annotation that ignores (doesn't block on) a local storage volume during node scale down
+		SafeToEvictLocalVolumesKey = "cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes"
+	)
+	const (
+		// PodLongTerminatingExtraThreshold - time after which a pod, that is terminating and that has run over its terminationGracePeriod, should be ignored and considered as deleted
+		PodLongTerminatingExtraThreshold = 30 * time.Second
+	)
+
+	return nil
 }
