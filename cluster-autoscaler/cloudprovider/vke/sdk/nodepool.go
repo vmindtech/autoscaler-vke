@@ -85,6 +85,7 @@ func (c *Client) ListNodePoolNodes(ctx context.Context, clusterID string, poolID
 }
 
 // CreateNodePoolOpts defines required fields to create a node pool
+// Not using for this project.
 type CreateNodePoolOpts struct {
 	Name       *string `json:"name,omitempty"`
 	FlavorName string  `json:"flavorName"`
@@ -99,7 +100,7 @@ type CreateNodePoolOpts struct {
 }
 
 // CreateNodePool allows to creates a node pool in a cluster
-
+// Not using for this project.
 func (c *Client) CreateNodePool(ctx context.Context, projectID string, clusterID string, opts *CreateNodePoolOpts) (*NodePool, error) {
 	nodepool := &NodePool{}
 
@@ -143,6 +144,7 @@ func (c *Client) UpdateNodePool(ctx context.Context, clusterID string, poolID st
 }
 
 // DeleteNodePool allows to delete a specific node pool
+// Not using for this project.
 func (c *Client) DeleteNodePool(ctx context.Context, projectID string, clusterID string, poolID string) (*NodePool, error) {
 	nodepool := &NodePool{}
 
