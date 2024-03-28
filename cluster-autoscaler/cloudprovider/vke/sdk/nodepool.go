@@ -33,7 +33,6 @@ type NodePool struct {
 	MinNodes     uint32 `json:"node_group_min_size"`
 	MaxNodes     uint32 `json:"node_group_max_size"`
 	CurrentNodes int    `json:"current_nodes"`
-	DesiredNodes uint32 `json:"desired_nodes"`
 }
 
 // ListNodePools allows to list all node pools available in a cluster
@@ -94,9 +93,8 @@ type CreateNodePoolOpts struct {
 	MonthlyBilled bool `json:"monthlyBilled"`
 	AntiAffinity  bool `json:"antiAffinity"`
 
-	DesiredNodes *uint32 `json:"desiredNodes,omitempty"`
-	MinNodes     *uint32 `json:"minNodes,omitempty"`
-	MaxNodes     *uint32 `json:"maxNodes,omitempty"`
+	MinNodes *uint32 `json:"minNodes,omitempty"`
+	MaxNodes *uint32 `json:"maxNodes,omitempty"`
 }
 
 // CreateNodePool allows to creates a node pool in a cluster
@@ -118,9 +116,8 @@ func (c *Client) CreateNodePool(ctx context.Context, projectID string, clusterID
 
 // UpdateNodePoolOpts defines required fields to update a node pool
 type UpdateNodePoolOpts struct {
-	DesiredNodes *uint32 `json:"desiredNodes,omitempty"`
-	MinNodes     *uint32 `json:"minNodes,omitempty"`
-	MaxNodes     *uint32 `json:"maxNodes,omitempty"`
+	MinNodes *uint32 `json:"minNodes,omitempty"`
+	MaxNodes *uint32 `json:"maxNodes,omitempty"`
 
 	Autoscale *bool `json:"autoscale,omitempty"`
 

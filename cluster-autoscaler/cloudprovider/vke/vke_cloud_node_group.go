@@ -59,9 +59,6 @@ func (ng *NodeGroup) MinSize() int {
 func (ng *NodeGroup) TargetSize() (int, error) {
 	// By default, fetch the API desired nodes before using target size from autoscaler
 	klog.V(4).Infof("NodeGroup %s has a target size of %d", ng.ID, ng.CurrentNodes)
-	if ng.CurrentNodes == -1 {
-		return int(ng.DesiredNodes), nil
-	}
 	return ng.CurrentNodes, nil
 }
 
@@ -86,24 +83,13 @@ func (ng *NodeGroup) IncreaseSize(delta int) error {
 	}
 
 	// Then, forge current size and parameters
-	ng.CurrentSize = size + delta
 
-	desired := uint32(ng.CurrentSize)
-	opts := sdk.UpdateNodePoolOpts{
-		DesiredNodes: &desired,
-	}
-	klog.V(4).Infof("Upscaling node pool %s to %d desired nodes", ng.ID, desired)
+	klog.V(4).Infof("Upscaling node pool %s to %d current nodes", ng.ID, ng.CurrentNodes)
 	for i := 0; i < delta; i++ {
 		_, err := ng.Manager.Client.AddNode(context.Background(), ng.Manager.ClusterID, ng.ID)
 		if err != nil {
 			return fmt.Errorf("failed to increase node pool desired size: %w", err)
 		}
-		// Call API to increase desired nodes number, automatically creating new nodes
-		resp, err := ng.Manager.Client.UpdateNodePool(context.Background(), ng.Manager.ClusterID, ng.ID, &opts)
-		if err != nil {
-			return fmt.Errorf("failed to increase node pool desired size: %w", err)
-		}
-		ng.Status = resp.Status
 	}
 
 	return nil
@@ -114,8 +100,8 @@ func (ng *NodeGroup) DeleteNodes(nodes []*apiv1.Node) error {
 	// DeleteNodes is called in goroutine so it can run in parallel
 	// Goroutines created in: ScaleDown.scheduleDeleteEmptyNodes()
 	// Adding mutex to ensure CurrentSize attribute keeps consistency
-	ng.mutex.Lock()
-	defer ng.mutex.Unlock()
+	// ng.mutex.Lock()
+	// defer ng.mutex.Unlock()
 
 	// Do not use node group which does not support autoscaling
 
@@ -133,29 +119,15 @@ func (ng *NodeGroup) DeleteNodes(nodes []*apiv1.Node) error {
 	}
 
 	for _, node := range nodes {
-		size, err = ng.TargetSize()
-		if err != nil {
-			return fmt.Errorf("failed to get NodeGroup target size")
-		}
 		err = ng.Manager.Client.DeleteNode(context.Background(), ng.Manager.ClusterID, ng.ID, node.Name)
 		if err != nil {
 			return fmt.Errorf("failed to delete node %s: %w", node.Name, err)
 		}
 	}
-	desired := uint32(size - len(nodes))
-	opts := sdk.UpdateNodePoolOpts{
-		DesiredNodes: &desired,
-	}
-	klog.V(4).Infof("Downscaling node pool %s to %d desired nodes by deleting the following nodes: %s", ng.ID, desired, nodes)
-
-	// Call API to remove nodes from a NodeGroup
-	resp, err := ng.Manager.Client.UpdateNodePool(context.Background(), ng.Manager.ClusterID, ng.ID, &opts)
+	size, err = ng.TargetSize()
 	if err != nil {
-		return fmt.Errorf("failed to delete node pool nodes: %w", err)
+		return fmt.Errorf("failed to get NodeGroup target size")
 	}
-	// Update the node group
-	ng.Status = resp.Status
-	ng.CurrentSize = size - len(nodes)
 
 	return nil
 }
@@ -264,17 +236,15 @@ func (ng *NodeGroup) Create() (cloudprovider.NodeGroup, error) {
 
 	// Forge create node pool parameters (defaulting b2-7 for now)
 	name := ng.Id()
-	size := uint32(ng.CurrentSize)
 	min := uint32(ng.MinSize())
 	max := uint32(ng.MaxSize())
 
 	opts := sdk.CreateNodePoolOpts{
-		FlavorName:   "b2-7",
-		Name:         &name,
-		DesiredNodes: &size,
-		MinNodes:     &min,
-		MaxNodes:     &max,
-		Autoscale:    true,
+		FlavorName: "b2-7",
+		Name:       &name,
+		MinNodes:   &min,
+		MaxNodes:   &max,
+		Autoscale:  true,
 	}
 
 	// Call API to add a node pool in the project/cluster
