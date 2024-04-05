@@ -39,7 +39,7 @@ type NodePool struct {
 func (c *Client) ListNodePools(ctx context.Context, clusterID string) ([]NodePool, error) {
 	klog.V(2).Infof("Listing node pools for cluster %s", clusterID)
 	nodepools := make([]NodePool, 0)
-	return nodepools, c.CallAPIWithContext(
+	err := c.CallAPIWithContext(
 		ctx,
 		"GET",
 		fmt.Sprintf("/cluster/%s/nodegroups", clusterID),
@@ -49,6 +49,18 @@ func (c *Client) ListNodePools(ctx context.Context, clusterID string) ([]NodePoo
 		nil,
 		true,
 	)
+	for i, nodepool := range nodepools {
+		if uint32(nodepool.CurrentNodes) < nodepools[i].MinNodes {
+			delta := nodepools[i].MinNodes - uint32(nodepool.CurrentNodes)
+			for j := 0; j < int(delta); j++ {
+				_, err := c.AddNode(ctx, clusterID, nodepool.ID)
+				if err != nil {
+					klog.Errorf("Failed to add node to nodepool %s", nodepool.ID)
+				}
+			}
+		}
+	}
+	return nodepools, err
 }
 
 // GetNodePool allows to display information for a specific node pool
