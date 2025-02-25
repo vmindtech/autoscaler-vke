@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	GPULabel = "node.kubernetes.ovhcloud.com/gpu"
+	GPULabel = "node.kubernetes.vke.com.tr/gpu"
 
 	// NodePoolLabel is the label added to nodes grouped by node group.
 	NodePoolLabel = "nodepool"

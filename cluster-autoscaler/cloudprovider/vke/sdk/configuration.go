@@ -28,20 +28,6 @@ var (
 	localConfigPath  = "./vke.conf"
 )
 
-// loadConfig loads client configuration from params, environments or configuration
-// files (by order of decreasing precedence).
-//
-// loadConfig will check OVH_CONSUMER_KEY, OVH_APPLICATION_KEY, OVH_APPLICATION_SECRET
-// and OVH_ENDPOINT environment variables. If any is present, it will take precedence
-// over any configuration from file.
-//
-// Configuration files are ini files. They share the same format as python-ovh,
-// node-ovh, php-ovh and all other wrappers. If any wrapper is configured, all
-// can re-use the same configuration. loadConfig will check for configuration in:
-//
-// - ./ovh.conf
-// - $HOME/.ovh.conf
-// - /etc/ovh.conf
 func (c *Client) loadConfig(endpointName string) error {
 	// Load real endpoint URL by name. If endpoint contains a '/', consider it as a URL
 	if strings.Contains(endpointName, "/") {

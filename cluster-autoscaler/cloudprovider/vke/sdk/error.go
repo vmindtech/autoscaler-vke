@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -58,7 +59,7 @@ func (e Error) Error() string {
 // This is a temporary fix until the issue is correctly handled
 func IsPossiblyCanadianTenantSyncError(err error, url string) bool {
 	var apiError *APIError
-	return (strings.HasPrefix(url, VKE) || strings.HasPrefix(url, "https://tatooine-vke-api.vmind.com.tr/api/v1")) &&
+	return (strings.HasPrefix(url, VKE) || strings.HasPrefix(url, os.Getenv("VKE_URL"))) &&
 		errors.As(err, &apiError) &&
 		apiError.Code == http.StatusInternalServerError &&
 		apiError.Message == canadianTenantSyncErrorMessage

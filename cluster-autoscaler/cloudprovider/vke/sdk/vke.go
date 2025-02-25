@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 )
@@ -34,9 +35,8 @@ import (
 const DefaultTimeout = 180 * time.Second
 
 // Endpoints
-const (
-	VKE = "http://vke-api.sakla.me/api/v1"
-)
+
+var VKE = os.Getenv("VKE_URL")
 
 // Endpoints conveniently maps endpoints names to their URI for external configuration
 var Endpoints = map[string]string{
@@ -45,14 +45,10 @@ var Endpoints = map[string]string{
 
 // Errors
 var (
-	ErrAPIDown = errors.New("go-vh: the OVH API is down, it does't respond to /time anymore")
+	ErrAPIDown = errors.New("The VKE API is down, it does't respond to /time anymore")
 )
 
-// Client represents a client to call the OVH API
 type Client struct {
-	// Self generated tokens. Create one by visiting
-	// https://eu.api.ovh.com/createApp/
-	// AppKey holds the Application key
 	AppKey string
 
 	// AppSecret holds the Application secret key
@@ -114,7 +110,6 @@ func NewDefaultClient() (*Client, error) {
 // or configuration files using an OpenStack keystone token
 func NewDefaultClientWithToken(authUrl, token string) (*Client, error) {
 	// Find endpoint given the keystone auth url
-	// Create OVH api client
 	endpoint := VKE
 	client, err := NewClient(endpoint, "none", "none", "none")
 	if err != nil {
@@ -126,11 +121,8 @@ func NewDefaultClientWithToken(authUrl, token string) (*Client, error) {
 	return client, nil
 }
 
-//
 // High level helpers
 //
-
-// Ping performs a ping to OVH API.
 // In fact, ping is just a /auth/time call, in order to check if API is up.
 func (c *Client) Ping() error {
 	_, err := c.getTime()
@@ -138,12 +130,10 @@ func (c *Client) Ping() error {
 }
 
 // TimeDelta represents the delay between the machine that runs the code and the
-// OVH API. The delay shouldn't change, let's do it only once.
 func (c *Client) TimeDelta() (time.Duration, error) {
 	return c.getTimeDelta()
 }
 
-// Time returns time from the OVH API, by asking GET /auth/time.
 func (c *Client) Time() (*time.Time, error) {
 	return c.getTime()
 }
@@ -243,12 +233,12 @@ func (c *Client) getTimeDelta() (time.Duration, error) {
 
 		// Did we wait ? Maybe no more needed
 		if !c.timeDeltaDone {
-			ovhTime, err := c.getTime()
+			vkeTime, err := c.getTime()
 			if err != nil {
 				return 0, err
 			}
 
-			c.timeDelta = time.Since(*ovhTime)
+			c.timeDelta = time.Since(*vkeTime)
 			c.timeDeltaDone = true
 		}
 	}
@@ -411,17 +401,15 @@ func (c *Client) CallAPIWithContext(ctx context.Context, method, path string, re
 	}
 	err = c.UnmarshalResponse(response, result)
 	if err != nil {
-		// An error 500 on api.ovh.com could be due to the tenant being canadian and too recent, so let's retry on ca.api.ovh.
 		// This is a temporary fix until the issue is correctly handled
 		if IsPossiblyCanadianTenantSyncError(err, req.URL.String()) {
 			// Create a canadian API client with the same token
 			client, err2 := NewClient(VKE, "none", "none", "")
 			if err2 != nil {
-				return fmt.Errorf("failed to create canadian ovh API client for fallback: %w", err2)
+				return fmt.Errorf("failed to create canadian VKE API client for fallback: %w", err2)
 			}
 			client.openStackToken = c.openStackToken
 
-			// Execute the same call on ca.api.ovh.com and ignore the potential error, we will return the original one
 			err2 = client.CallAPIWithContext(ctx, method, path, reqBody, result, queryParams, headers, needAuth)
 			if err2 == nil {
 				// OK on the canadian API, our job is done
@@ -449,7 +437,7 @@ func (c *Client) UnmarshalResponse(response *http.Response, result interface{}) 
 		if err = json.Unmarshal(body, apiError); err != nil {
 			apiError.Message = string(body)
 		}
-		apiError.QueryID = response.Header.Get("X-Ovh-QueryID")
+		apiError.QueryID = response.Header.Get("X-VKE-QueryID")
 
 		return apiError
 	}
